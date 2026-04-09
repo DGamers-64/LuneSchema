@@ -1,349 +1,67 @@
-// ─────────────────────────────────────────────────────────────────────────────
-//  LuneSchema — Type Definitions
-// ─────────────────────────────────────────────────────────────────────────────
+// index.d.ts
 
-/**
- * Resultado de validar un campo individual.
- * - `true` si es válido.
- * - `string` con el mensaje de error si falla.
- * - `Record<string, any>` si el error es anidado (objeto/array).
- */
-export type ValidationResult = true | string | Record<string, any>;
+type ValidationResult = true | string | Record<string, any>;
 
-/**
- * Función de validación personalizada.
- * Debe devolver `true` si el valor es válido, o un mensaje de error.
- */
-export type CustomValidator<T> = (value: T) => ValidationResult;
+interface BaseValidator<T> {
+    _type: string;
+    _isRequired(): boolean;
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  VALIDATORS
-// ─────────────────────────────────────────────────────────────────────────────
+    validate(value: any): ValidationResult;
 
-/**
- * Validador base para tipos primitivos (`string` y `number`).
- * Se obtiene a través de `LuneSchema.string()` o `LuneSchema.number()`.
- */
-export interface PrimitiveValidator<T> {
-  /** Tipo interno del validador (`"string"` | `"number"`). */
-  readonly _type: "string" | "number";
-
-  /** Devuelve `true` si el campo está marcado como requerido. */
-  _isRequired(): boolean;
-
-  /**
-   * Valida el valor dado contra todas las reglas configuradas.
-   * @returns `true` si es válido, o el mensaje de error.
-   */
-  validate(value: unknown): ValidationResult;
-
-  /**
-   * Marca el campo como obligatorio.
-   * @param message - Mensaje personalizado (por defecto: `"Campo requerido"`).
-   */
-  required(message?: string): this;
-
-  /**
-   * Añade una regla de validación personalizada.
-   * @param fn - Función que recibe el valor y devuelve `true` o un mensaje de error.
-   */
-  custom(fn: CustomValidator<T>): this;
+    required(message?: string): this;
+    custom(fn: (value: T) => ValidationResult): this;
 }
 
-/**
- * Validador para valores de tipo `string`.
- * Se obtiene a través de `LuneSchema.string()`.
- *
- * @example
- * ```js
- * const v = LuneSchema.string().required().minLength(3).maxLength(50);
- * v.validate("Hola"); // true
- * v.validate("Hi");   // "Mínimo 3 caracteres"
- * ```
- */
-export interface StringValidator extends PrimitiveValidator<string> {
-  readonly _type: "string";
-
-  /**
-   * Longitud máxima permitida.
-   * @param limit   - Número máximo de caracteres.
-   * @param message - Mensaje personalizado.
-   */
-  maxLength(limit: number, message?: string): this;
-
-  /**
-   * Longitud mínima requerida.
-   * @param limit   - Número mínimo de caracteres.
-   * @param message - Mensaje personalizado.
-   */
-  minLength(limit: number, message?: string): this;
+interface StringValidator extends BaseValidator<string> {
+    minLength(limit: number, message?: string): this;
+    maxLength(limit: number, message?: string): this;
+    email(message?: string): this;
+    url(message?: string): this;
+    regex(pattern: RegExp, message?: string): this;
+    enum(values: string[], message?: string): this;
 }
 
-/**
- * Validador para valores de tipo `number`.
- * Se obtiene a través de `LuneSchema.number()`.
- *
- * @example
- * ```js
- * const v = LuneSchema.number().required().min(0).max(100);
- * v.validate(50);  // true
- * v.validate(150); // "El valor máximo es 100"
- * ```
- */
-export interface NumberValidator extends PrimitiveValidator<number> {
-  readonly _type: "number";
-
-  /**
-   * Valor máximo permitido (inclusivo).
-   * @param limit   - Valor máximo.
-   * @param message - Mensaje personalizado.
-   */
-  max(limit: number, message?: string): this;
-
-  /**
-   * Valor mínimo requerido (inclusivo).
-   * @param limit   - Valor mínimo.
-   * @param message - Mensaje personalizado.
-   */
-  min(limit: number, message?: string): this;
+interface NumberValidator extends BaseValidator<number> {
+    min(limit: number, message?: string): this;
+    max(limit: number, message?: string): this;
+    enum(values: number[], message?: string): this;
 }
 
-/**
- * Validador para arrays.
- * Se obtiene a través de `LuneSchema.array(itemValidator?)`.
- *
- * @template T - Tipo de cada elemento del array.
- *
- * @example
- * ```js
- * const v = LuneSchema.array(LuneSchema.string().required()).minElements(1);
- * v.validate(["a", "b"]); // true
- * v.validate([]);          // "Mínimo 1 elemento(s)"
- * ```
- */
-export interface ArrayValidator<T = unknown> {
-  readonly _type: "array";
+interface BooleanValidator extends BaseValidator<boolean> {}
 
-  /** Devuelve `true` si el campo está marcado como requerido. */
-  _isRequired(): boolean;
+interface DateValidator extends BaseValidator<Date> {}
 
-  /**
-   * Valida el array y cada uno de sus elementos si se configuró `itemValidator`.
-   * @returns `true`, un mensaje de error, o un objeto `{ índice: error }` para errores por item.
-   */
-  validate(value: unknown): ValidationResult;
-
-  /**
-   * Marca el campo como obligatorio.
-   * @param message - Mensaje personalizado (por defecto: `"Campo requerido"`).
-   */
-  required(message?: string): this;
-
-  /**
-   * Número mínimo de elementos requeridos.
-   * @param limit   - Mínimo de elementos.
-   * @param message - Mensaje personalizado.
-   */
-  minElements(limit: number, message?: string): this;
-
-  /**
-   * Número máximo de elementos permitidos.
-   * @param limit   - Máximo de elementos.
-   * @param message - Mensaje personalizado.
-   */
-  maxElements(limit: number, message?: string): this;
-
-  /**
-   * Añade una regla de validación personalizada sobre el array completo.
-   * @param fn - Función que recibe el array y devuelve `true` o un mensaje de error.
-   */
-  custom(fn: CustomValidator<T[]>): this;
+interface ArrayValidator<T> extends BaseValidator<T[]> {
+    minElements(limit: number, message?: string): this;
+    maxElements(limit: number, message?: string): this;
 }
 
-/**
- * Mapa de validadores para las propiedades de un objeto.
- * Cada clave corresponde a un campo del objeto a validar.
- */
-export type ObjectDefinition = Record<
-  string,
-  StringValidator | NumberValidator | ArrayValidator | ObjectValidator
->;
+type ObjectDefinition = Record<string, BaseValidator<any>>;
 
-/**
- * Validador para objetos con una estructura definida.
- * Se obtiene a través de `LuneSchema.object(definition)`.
- *
- * @example
- * ```js
- * const v = LuneSchema.object({
- *   nombre: LuneSchema.string().required(),
- *   edad:   LuneSchema.number().min(0),
- * });
- * v.validate({ nombre: "Ana", edad: 25 }); // true
- * v.validate({ edad: -1 });                // { nombre: "Campo requerido", edad: "El valor mínimo es 0" }
- * ```
- */
-export interface ObjectValidator {
-  readonly _type: "object";
-
-  /** Devuelve `true` si el campo está marcado como requerido. */
-  _isRequired(): boolean;
-
-  /**
-   * Valida el objeto y todos sus campos definidos.
-   * @returns `true` si es válido, un mensaje de error, o un objeto con los errores por campo.
-   */
-  validate(value: unknown): ValidationResult;
-
-  /**
-   * Marca el campo como obligatorio.
-   * @param message - Mensaje personalizado (por defecto: `"Campo requerido"`).
-   */
-  required(message?: string): this;
+interface ObjectValidator extends BaseValidator<Record<string, any>> {
+    // Object validators don’t have extra methods for now
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  SCHEMA
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Mapa de validadores para las propiedades de un schema completo.
- */
-export type SchemaDefinition = Record<
-  string,
-  StringValidator | NumberValidator | ArrayValidator | ObjectValidator
->;
-
-/**
- * Resultado de validar un objeto con `schema.validate()`.
- *
- * @template T - Forma del objeto validado.
- */
-export interface SchemaValidationResult<T = Record<string, unknown>> {
-  /** `true` si todos los campos pasaron la validación. */
-  valid: boolean;
-  /** Objeto con los errores por campo. Vacío si `valid` es `true`. */
-  errors: Partial<Record<keyof T, ValidationResult>>;
-  /** Objeto con los campos válidos (solo incluye los que estaban presentes). */
-  value: Partial<T>;
+interface SchemaValidationResult {
+    valid: boolean;
+    errors: Record<string, any>;
+    value: Record<string, any>;
 }
 
-/**
- * Schema completo creado con `LuneSchema.schema(definition)`.
- * Valida un objeto entero de una sola vez.
- *
- * @template T - Forma del objeto a validar.
- *
- * @example
- * ```js
- * const schema = LuneSchema.schema({
- *   nombre: LuneSchema.string().required().maxLength(100),
- *   edad:   LuneSchema.number().min(0).max(120),
- * });
- *
- * const { valid, errors, value } = schema.validate({ nombre: "Ana", edad: 25 });
- * ```
- */
-export interface Schema<T = Record<string, unknown>> {
-  /**
-   * Valida el objeto completo contra la definición del schema.
-   * @param data - Objeto a validar.
-   * @returns Resultado con `valid`, `errors` y `value`.
-   */
-  validate(data: Record<string, unknown>): SchemaValidationResult<T>;
+interface SchemaValidator {
+    validate(data: Record<string, any>): SchemaValidationResult;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  LUNESCHEMA NAMESPACE
-// ─────────────────────────────────────────────────────────────────────────────
+export interface LuneSchemaAPI {
+    string(): StringValidator;
+    number(): NumberValidator;
+    boolean(): BooleanValidator;
+    date(): DateValidator;
+    array<T>(itemValidator: BaseValidator<T>): ArrayValidator<T>;
+    object(definition: ObjectDefinition): ObjectValidator;
+    schema(definition: ObjectDefinition): SchemaValidator;
+}
 
-/**
- * ## LuneSchema
- * Librería de validación con encadenamiento fluido de reglas.
- * Compatible con `LuneDataBase` para validar schemas de tablas.
- *
- * @example
- * ```js
- * import LuneSchema from './LuneSchema.js';
- *
- * const schema = LuneSchema.schema({
- *   username: LuneSchema.string().required().minLength(3).maxLength(20),
- *   age:      LuneSchema.number().required().min(18),
- *   tags:     LuneSchema.array(LuneSchema.string()).minElements(1),
- * });
- *
- * const { valid, errors } = schema.validate({ username: "Lu", age: 15 });
- * // valid  → false
- * // errors → { username: "Mínimo 3 caracteres", age: "El valor mínimo es 18" }
- * ```
- */
-declare const LuneSchema: {
-  /**
-   * Crea un validador para valores de tipo `string`.
-   *
-   * @example
-   * ```js
-   * LuneSchema.string().required().minLength(2).maxLength(50)
-   * ```
-   */
-  string(): StringValidator;
-
-  /**
-   * Crea un validador para valores de tipo `number`.
-   *
-   * @example
-   * ```js
-   * LuneSchema.number().required().min(0).max(999)
-   * ```
-   */
-  number(): NumberValidator;
-
-  /**
-   * Crea un validador para arrays.
-   * Opcionalmente recibe un validador para los elementos individuales.
-   *
-   * @param itemValidator - Validador aplicado a cada elemento del array.
-   *
-   * @example
-   * ```js
-   * LuneSchema.array(LuneSchema.string().required()).minElements(1)
-   * ```
-   */
-  array<T = unknown>(
-    itemValidator?: StringValidator | NumberValidator | ArrayValidator<T> | ObjectValidator
-  ): ArrayValidator<T>;
-
-  /**
-   * Crea un validador para objetos con una estructura definida.
-   *
-   * @param definition - Mapa de campo → validador.
-   *
-   * @example
-   * ```js
-   * LuneSchema.object({
-   *   calle:  LuneSchema.string().required(),
-   *   numero: LuneSchema.number().min(1),
-   * })
-   * ```
-   */
-  object(definition: ObjectDefinition): ObjectValidator;
-
-  /**
-   * Crea un schema completo que valida un objeto entero de una sola vez.
-   * Devuelve `{ valid, errors, value }`.
-   *
-   * @param definition - Mapa de campo → validador.
-   *
-   * @example
-   * ```js
-   * const schema = LuneSchema.schema({
-   *   email: LuneSchema.string().required(),
-   *   edad:  LuneSchema.number().min(18),
-   * });
-   * const { valid, errors } = schema.validate(data);
-   * ```
-   */
-  schema<T = Record<string, unknown>>(definition: SchemaDefinition): Schema<T>;
-};
+declare const LuneSchema: LuneSchemaAPI;
 
 export default LuneSchema;
